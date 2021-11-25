@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
 import express from 'express';
+import fs from 'fs';
 
 import { apiv1 } from './api';
 import { ImageCache } from './lib/imageCache';
@@ -7,13 +8,14 @@ import { log } from './lib/logging';
 
 // #region ENV
 config();
-const required_env_vars = ['PORT', 'UPLOAD_LIMIT', 'AUTH'];
+const required_env_vars = ['PORT', 'UPLOAD_LIMIT', 'AUTH', 'BASE_URL'];
 
 enum Environment {
     PORT,
     UPLOAD_LIMIT,
     AUTH,
     DEBUG,
+    BASE_URL,
 }
 
 for (const env_var of required_env_vars) {
@@ -37,7 +39,11 @@ export const authTokens = ENV.AUTH?.split(',') ?? [];
 
 // #endregion
 
-export const BASE_URL = `http://localhost:${ENV.PORT}/`;
+export const BASE_URL: string = ENV.BASE_URL ?? `http://localhost:${ENV.PORT}/`;
+
+if (!fs.existsSync('images/')) {
+    fs.mkdirSync('images/');
+}
 
 const app = express();
 
@@ -54,7 +60,6 @@ app.use(function (req, res) {
 });
 
 app.listen(ENV.PORT, () => {
-
     (async () => {
         await ImageCache.init();
         log.debug(ImageCache.cache);
@@ -62,7 +67,7 @@ app.listen(ENV.PORT, () => {
 
     log.ok(`Server started at ${BASE_URL}`);
     log.ok(`Port: ${ENV.PORT}`);
-    log.ok(`Upload limit: ${ENV.UPLOAD_LIMIT}`);
+    log.ok(`Upload limit: ${ENV.UPLOAD_LIMIT} MB`);
     log.ok(`Auth tokens: ${authTokens.join(', ')}`);
     log.ok(`Debug mode: ${ENV.DEBUG ?? 'false'}`);
     log.ok(`Environment: ${process.env.NODE_ENV}`);
