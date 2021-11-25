@@ -2,9 +2,10 @@ import express from 'express';
 import fs from 'fs';
 import multer from 'multer';
 
+import { ImageCache } from './lib/imageCache';
 import { log } from './lib/logging';
 import { makeId } from './lib/makeId';
-import { authTokens, BASE_URL, ENV } from './server';
+import { authTokens, BASE_URL } from './server';
 
 export const apiv1 = express.Router();
 
@@ -64,7 +65,11 @@ apiv1.use(function (req, res, next) {
     }
 });
 
-apiv1.post('/upload', upload.single('image'), (req, res) => {
+apiv1.post('/upload', upload.single('image'), async (req, res) => {
+    if (req.file) {
+        await ImageCache.createCacheForFile(req.file.filename);
+    }
+
     res.json({
         originalName: req.file?.originalname,
         name: req.file?.filename,
@@ -78,23 +83,23 @@ apiv1.post('/rename', express.json(), (req, res) => {
 
     const re = /^\w/;
     if (!re.test(newName) || !re.test(oldName)) {
-        return res
-            .status(500)
-            .json({
-                error: re.test(oldName)
-                    ? 'newName is not a valid file'
-                    : 'oldName is not a valid file',
-            });
+        return res.status(500).json({
+            error: re.test(oldName)
+                ? 'newName is not a valid file'
+                : 'oldName is not a valid file',
+        });
     }
 
     const oldPath = 'images/' + oldName;
     const newPath = 'images/' + newName;
     // rename file in development environment
-    fs.rename(oldPath, newPath, (err) => {
+    fs.rename(oldPath, newPath, async (err) => {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
         log.debug('Rename complete!');
+        await ImageCache.updateCacheForFile(oldName, newName);
+
         res.json({
             message: 'Rename complete!',
         });
@@ -103,13 +108,7 @@ apiv1.post('/rename', express.json(), (req, res) => {
 
 // express return all images in images folder
 apiv1.get('/list', (req, res) => {
-    fs.readdir('images', (err, files) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        log.debug(files);
-        res.json(files);
-    });
+    res.json(ImageCache.cache);
 });
 
 // express delete image file from images folder
@@ -119,9 +118,7 @@ apiv1.post('/delete', express.json(), (req, res) => {
 
     const re = /^\w/;
     if (!re.test(name)) {
-        return res
-            .status(500)
-            .json({ error: 'name is not a valid file' });
+        return res.status(500).json({ error: 'name is not a valid file' });
     }
 
     const path = 'images/' + name;
@@ -131,6 +128,9 @@ apiv1.post('/delete', express.json(), (req, res) => {
             return res.status(500).json({ error: err.message });
         }
         log.debug('Delete complete!');
+
+        ImageCache.deleteCacheForFile(name);
+
         res.json({
             message: 'Delete complete!',
         });

@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import express from 'express';
 
 import { apiv1 } from './api';
+import { ImageCache } from './lib/imageCache';
 import { log } from './lib/logging';
 
 // #region ENV
@@ -53,6 +54,12 @@ app.use(function (req, res) {
 });
 
 app.listen(ENV.PORT, () => {
+
+    (async () => {
+        await ImageCache.init();
+        log.debug(ImageCache.cache);
+    })();
+
     log.ok(`Server started at ${BASE_URL}`);
     log.ok(`Port: ${ENV.PORT}`);
     log.ok(`Upload limit: ${ENV.UPLOAD_LIMIT}`);
