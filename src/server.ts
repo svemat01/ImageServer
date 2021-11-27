@@ -35,7 +35,7 @@ export const ENV: Partial<{ [key in keyof typeof Environment]: string }> =
             .map((a) => ({ [a]: process.env[a] }))
     );
 
-export const authTokens = ENV.AUTH?.split(',') ?? [];
+export const authTokens = ENV.AUTH?.trim().split(',') ?? [];
 
 // #endregion
 
